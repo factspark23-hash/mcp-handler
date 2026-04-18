@@ -2,7 +2,6 @@
 import asyncio
 import logging
 from .connector import ServerConnector
-from .registry import Registry
 from .db import Database
 
 logger = logging.getLogger("mcp_hub.autorun")
@@ -72,7 +71,7 @@ class AutoRunner:
                 if connector and not connector.is_connected:
                     # Check if all dependencies are up
                     all_deps_up = all(
-                        self._connectors.get(dep, ServerConnector(dep, {})).is_connected
+                        self._connectors.get(dep) and self._connectors[dep].is_connected
                         for dep in deps
                     )
                     if all_deps_up:

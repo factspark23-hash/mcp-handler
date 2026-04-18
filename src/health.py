@@ -69,8 +69,12 @@ class HealthMonitor:
 
         if latency is not None:
             status = "up"
+            prev_up = stats["last_up"]
             stats["status"] = "up"
             stats["last_up"] = now
+            # Accumulate up time since last check
+            if prev_up > 0:
+                stats["total_up_time"] += min(self.interval, now - prev_up)
         else:
             status = "down"
             stats["status"] = "down"

@@ -26,6 +26,7 @@ class Router:
         self._tracking_enabled = True
         self._track_params = False
         self.cost_registry: dict[str, dict] = {}  # tool_name -> {cost_type, cost_value, description}
+        self._call_count = 0
 
     def register_connector(self, name: str, connector: ServerConnector):
         self._connectors[name] = connector
@@ -61,18 +62,27 @@ class Router:
                 TextContent(type="text", text=str(mcp_result))
             ]
         except Exception as e:
-            # Retry once after 5s
-            logger.warning(f"Tool call '{original_name}' on '{server_name}' failed, retrying: {e}")
-            await asyncio.sleep(5)
-            try:
-                mcp_result = await connector.call_tool(original_name, arguments)
-                result_content = mcp_result.content if hasattr(mcp_result, 'content') else [
-                    TextContent(type="text", text=str(mcp_result))
-                ]
-            except Exception as e2:
+            # Only retry on transient errors (connection/timeout), not permanent ones
+            err_str = str(e).lower()
+            is_transient = any(kw in err_str for kw in (
+                "timeout", "connection", "reset", "broken pipe", "eof", "disconnected"
+            ))
+            if is_transient:
+                logger.warning(f"Tool call '{original_name}' on '{server_name}' failed (transient), retrying: {e}")
+                await asyncio.sleep(3)
+                try:
+                    mcp_result = await connector.call_tool(original_name, arguments)
+                    result_content = mcp_result.content if hasattr(mcp_result, 'content') else [
+                        TextContent(type="text", text=str(mcp_result))
+                    ]
+                except Exception as e2:
+                    status = "error"
+                    error_msg = str(e2)
+                    result_content = [TextContent(type="text", text=f"Error calling '{tool_name}': {e2}")]
+            else:
                 status = "error"
-                error_msg = str(e2)
-                result_content = [TextContent(type="text", text=f"Error calling '{tool_name}': {e2}")]
+                error_msg = str(e)
+                result_content = [TextContent(type="text", text=f"Error calling '{tool_name}': {e}")]
 
         duration_ms = (time.monotonic() - start) * 1000
 
@@ -117,8 +127,10 @@ class Router:
 
             self.session.record_call(status, duration_ms)
 
-            # Prune old records periodically
-            await self.db.prune_old_records(100000)
+            # Prune old records every 100 calls (not every call)
+            self._call_count += 1
+            if self._call_count % 100 == 0:
+                await self.db.prune_old_records(100000)
 
         return result_content or [TextContent(type="text", text="(no response)")]
 

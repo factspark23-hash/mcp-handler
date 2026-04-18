@@ -30,7 +30,11 @@ class Registry:
         for name, connector in self._connectors.items():
             if not connector.is_connected:
                 continue
-            tools = await connector.discover_tools()
+            # Use already-discovered tools from the connector
+            tools = connector.tools
+            if not tools:
+                # First time: discover from the server
+                tools = await connector.discover_tools()
             tool_names = [t.name for t in tools]
             server_tools[name] = tool_names
             server_tool_objects[name] = {t.name: t for t in tools}

@@ -115,12 +115,16 @@ class Database:
         await self._db.commit()
 
     async def get_stats(self, since_hours: float = None):
-        query = "SELECT * FROM tool_stats ORDER BY total_calls DESC"
         if since_hours:
-            # Filter tool_stats by last_called
             cutoff = time.time() - (since_hours * 3600)
-            query = f"SELECT * FROM tool_stats WHERE last_called > {cutoff} ORDER BY total_calls DESC"
-        async with self._db.execute(query) as cursor:
+            async with self._db.execute(
+                "SELECT * FROM tool_stats WHERE last_called > ? ORDER BY total_calls DESC",
+                (cutoff,)
+            ) as cursor:
+                return [dict(row) async for row in cursor]
+        async with self._db.execute(
+            "SELECT * FROM tool_stats ORDER BY total_calls DESC"
+        ) as cursor:
             return [dict(row) async for row in cursor]
 
     async def get_call_history(self, limit: int = 50, since_hours: float = None,

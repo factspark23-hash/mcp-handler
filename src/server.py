@@ -57,6 +57,10 @@ class MCPHub:
         # Connectors
         self._connectors: dict[str, ServerConnector] = {}
 
+        # Workflow templates and stateful sessions (in-memory)
+        self._workflow_templates: dict[str, list] = {}
+        self._stateful_sessions: dict[str, dict] = {}
+
         # MCP Server
         self.server = Server(hub_cfg.get("name", "MCP Hub"))
         self._initialized = False
@@ -256,8 +260,6 @@ class MCPHub:
                 "required": ["tool", "cost_type"],
             }),
         ]
-
-        hub_tool_names = {t.name for t in HUB_TOOLS}
 
         @self.server.list_tools()
         async def list_tools():
@@ -586,7 +588,8 @@ class MCPHub:
         try:
             self.config.load()
             self.alias_manager.load_from_config(self.config.servers)
-            return [TextContent(type="text", text="Config reloaded (restart needed for server changes)")]
+            await self.registry.discover_all()
+            return [TextContent(type="text", text="Config reloaded successfully")]
         except Exception as e:
             return [TextContent(type="text", text=f"Config reload failed: {e}")]
 
@@ -619,13 +622,22 @@ class MCPHub:
             tool_name = step["tool"]
             step_args = step.get("arguments", {})
 
-            # Resolve references to previous step outputs
-            args_str = json.dumps(step_args)
-            for match in re.finditer(r'\{\{step_(\d+)\.output\}\}', args_str):
-                ref_idx = int(match.group(1)) - 1
-                if 0 <= ref_idx < len(results):
-                    args_str = args_str.replace(match.group(0), results[ref_idx])
-            step_args = json.loads(args_str)
+            # Resolve references to previous step outputs in string values
+            def resolve_refs(obj):
+                if isinstance(obj, str):
+                    def replacer(match):
+                        ref_idx = int(match.group(1)) - 1
+                        if 0 <= ref_idx < len(results):
+                            return results[ref_idx]
+                        return match.group(0)
+                    return re.sub(r'\{\{step_(\d+)\.output\}\}', replacer, obj)
+                elif isinstance(obj, dict):
+                    return {k: resolve_refs(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [resolve_refs(v) for v in obj]
+                return obj
+
+            step_args = resolve_refs(step_args)
 
             try:
                 result = await self.router.route_call(tool_name, step_args)
@@ -640,7 +652,7 @@ class MCPHub:
 
     async def _hub_compose_template(self, args):
         action = args["action"]
-        templates = getattr(self, "_workflow_templates", {})
+        templates = self._workflow_templates
         if action == "save":
             name = args["name"]
             templates[name] = args.get("steps", [])
@@ -670,7 +682,7 @@ class MCPHub:
     async def _hub_session_begin(self, args):
         import uuid
         sid = str(uuid.uuid4())[:12]
-        sessions = getattr(self, "_stateful_sessions", {})
+        sessions = self._stateful_sessions
         sessions[sid] = {
             "name": args["name"],
             "context": args.get("context", {}),
@@ -682,7 +694,7 @@ class MCPHub:
 
     async def _hub_session_step(self, args):
         sid = args["session_id"]
-        sessions = getattr(self, "_stateful_sessions", {})
+        sessions = self._stateful_sessions
         session = sessions.get(sid)
         if not session:
             return [TextContent(type="text", text=f"Session '{sid}' not found. Use hub_session_begin first.")]
@@ -784,6 +796,13 @@ class MCPHub:
             logger.info(f"[{name}] Removing (no longer in config)")
             await self._connectors[name].disconnect()
             del self._connectors[name]
+            self.registry._connectors.pop(name, None)
+            self.router._connectors.pop(name, None)
+            self.health._connectors.pop(name, None)
+            self.health._server_status.pop(name, None)
+            self.autorun._connectors.pop(name, None)
+            self.autorun._server_configs.pop(name, None)
+            self.autorun._dependencies.pop(name, None)
 
         # Add new servers
         for name in new_servers - old_servers:
@@ -823,10 +842,11 @@ async def run(config_path: str = "mcp_hub.yaml"):
     hub = MCPHub(config_path)
     await hub.initialize()
 
-    async with stdio_server() as (read_stream, write_stream):
-        await hub.server.run(read_stream, write_stream, hub.server.create_initialization_options())
-
-    await hub.shutdown()
+    try:
+        async with stdio_server() as (read_stream, write_stream):
+            await hub.server.run(read_stream, write_stream, hub.server.create_initialization_options())
+    finally:
+        await hub.shutdown()
 
 
 def main():
