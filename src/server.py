@@ -896,7 +896,26 @@ async def run(config_path: str = "mcp_hub.yaml"):
 
 
 def main():
-    config_path = sys.argv[1] if len(sys.argv) > 1 else "mcp_hub.yaml"
+    args = sys.argv[1:]
+
+    # Handle --dismiss-funding
+    if "--dismiss-funding" in args:
+        from .funding import dismiss
+        dismiss()
+        return
+
+    # Show funding prompt on first run (before server starts)
+    from .funding import show, is_dismissed
+    if not is_dismissed():
+        show()
+
+    # Find config path (first arg that isn't a flag)
+    config_path = "mcp_hub.yaml"
+    for arg in args:
+        if not arg.startswith("--"):
+            config_path = arg
+            break
+
     asyncio.run(run(config_path))
 
 
