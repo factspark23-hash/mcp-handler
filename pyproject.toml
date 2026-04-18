@@ -12,11 +12,14 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-hub = "src.server:main"
+mcp-hub = "src.mcp_hub_cli:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

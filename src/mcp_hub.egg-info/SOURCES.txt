@@ -6,8 +6,10 @@ src/autorun.py
 src/config.py
 src/connector.py
 src/db.py
+src/funding.py
 src/health.py
 src/hotreload.py
+src/mcp_hub_cli.py
 src/namespacing.py
 src/quiet.py
 src/registry.py
@@ -21,3 +23,5 @@ src/mcp_hub.egg-info/dependency_links.txt
 src/mcp_hub.egg-info/entry_points.txt
 src/mcp_hub.egg-info/requires.txt
 src/mcp_hub.egg-info/top_level.txt
+tests/test_core.py
+tests/test_integration.py

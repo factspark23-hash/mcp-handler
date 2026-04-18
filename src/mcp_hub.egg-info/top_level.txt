@@ -4,8 +4,10 @@ autorun
 config
 connector
 db
+funding
 health
 hotreload
+mcp_hub_cli
 namespacing
 quiet
 registry

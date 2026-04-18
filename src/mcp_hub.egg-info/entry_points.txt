@@ -1,2 +1,2 @@
 [console_scripts]
-mcp-hub = src.server:main
+mcp-hub = src.mcp_hub_cli:main
