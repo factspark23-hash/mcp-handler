@@ -1,0 +1,42 @@
+hub:
+  name: "My MCP Hub"
+  log_level: "info"
+  database: "data/hub.db"
+  health_check_interval: 30
+  auto_restart: true
+  max_restart_attempts: 3
+  restart_delay: 5
+
+servers:
+  filesystem:
+    transport: "stdio"
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    enabled: true
+    aliases:
+      read_file: "fs_read"
+      write_file: "fs_write"
+      list_directory: "fs_ls"
+    depends_on: []
+
+  # sqlite:
+  #   transport: "stdio"
+  #   command: "uvx"
+  #   args: ["mcp-server-sqlite", "--db", "/tmp/test.db"]
+  #   enabled: true
+  #   aliases:
+  #     query: "db_query"
+  #   depends_on: [filesystem]
+
+namespacing:
+  mode: "auto"
+
+tracking:
+  enabled: true
+  max_records: 100000
+  track_params: false
+  session_tracking: true
+
+hotreload:
+  enabled: true
+  watch_interval: 5
