@@ -66,36 +66,82 @@ class MCPHub:
         self._initialized = False
         self._register_handlers()
 
+        # Let router dispatch hub tools (for compose/session)
+        self.router.register_hub_handler(self._dispatch_hub_tool)
+
+    async def _dispatch_hub_tool(self, name: str, args: dict):
+        """Dispatch a hub tool by name. Used by compose/session via router."""
+        handler_map = {
+            "hub_status": self._hub_status,
+            "hub_tools": self._hub_tools,
+            "hub_tool_info": self._hub_tool_info,
+            "hub_search_tools": self._hub_search_tools,
+            "hub_refresh": self._hub_refresh,
+            "hub_stats": self._hub_stats,
+            "hub_stats_detailed": self._hub_stats_detailed,
+            "hub_top_tools": self._hub_top_tools,
+            "hub_error_summary": self._hub_error_summary,
+            "hub_session_stats": self._hub_session_stats,
+            "hub_slow_tools": self._hub_slow_tools,
+            "hub_server_info": self._hub_server_info,
+            "hub_enable_server": self._hub_enable_server,
+            "hub_disable_server": self._hub_disable_server,
+            "hub_restart_server": self._hub_restart_server,
+            "hub_server_logs": self._hub_server_logs,
+            "hub_quiet_on": self._hub_quiet_on,
+            "hub_quiet_off": self._hub_quiet_off,
+            "hub_quiet_status": self._hub_quiet_status,
+            "hub_alias_set": self._hub_alias_set,
+            "hub_alias_remove": self._hub_alias_remove,
+            "hub_alias_list": self._hub_alias_list,
+            "hub_replay": self._hub_replay,
+            "hub_replay_one": self._hub_replay_one,
+            "hub_config_reload": self._hub_config_reload,
+            "hub_config_show": self._hub_config_show,
+            "hub_health_history": self._hub_health_history,
+            "hub_export_stats": self._hub_export_stats,
+            "hub_compose": self._hub_compose,
+            "hub_compose_template": self._hub_compose_template,
+            "hub_session_begin": self._hub_session_begin,
+            "hub_session_step": self._hub_session_step,
+            "hub_cost_estimate": self._hub_cost_estimate,
+            "hub_cost_register": self._hub_cost_register,
+        }
+        handler = handler_map.get(name)
+        if handler:
+            return await handler(args)
+        return [TextContent(type="text", text=f"Unknown hub tool: {name}")]
+
     def _register_handlers(self):
         """Register MCP protocol handlers. Decorators capture `self` — all state accessed lazily."""
 
         HUB_TOOLS = [
             # Status & Discovery (5)
-            Tool("hub_status", "Get hub and all servers status", {"type": "object", "properties": {}}),
-            Tool("hub_tools", "List all available tools", {
+            Tool(name="hub_status", description="Get hub and all servers status", inputSchema={"type": "object", "properties": {}}),
+            Tool(name="hub_tools", description="List all available tools", inputSchema={
                 "type": "object",
                 "properties": {
                     "server": {"type": "string", "description": "Filter by server name"},
                     "search": {"type": "string", "description": "Search tool names/descriptions"},
                 },
             }),
-            Tool("hub_tool_info", "Get detailed info about a specific tool", {
+            Tool(name="hub_tool_info", description="Get detailed info about a specific tool", inputSchema={
                 "type": "object",
                 "properties": {"name": {"type": "string", "description": "Tool name"}},
                 "required": ["name"],
             }),
-            Tool("hub_search_tools", "Search tools by name or description", {
+            Tool(name="hub_search_tools", description="Search tools by name or description", inputSchema={
                 "type": "object",
                 "properties": {"query": {"type": "string", "description": "Search query"}},
                 "required": ["query"],
             }),
-            Tool("hub_refresh", "Re-discover tools from all servers", {"type": "object", "properties": {}}),
+            Tool(name="hub_refresh", description="Re-discover tools from all servers", inputSchema={"type": "object", "properties": {}}),
             # Usage Analytics (6)
-            Tool("hub_stats", "Get aggregated usage statistics", {
+            Tool(name="hub_stats", description="Get aggregated usage statistics", inputSchema={
                 "type": "object",
                 "properties": {"since_hours": {"type": "number", "description": "Stats since N hours ago"}},
             }),
-            Tool("hub_stats_detailed", "Get filtered call history", {
+            Tool(name="hub_stats_detailed", description="Get filtered call history", inputSchema={
                 "type": "object",
                 "properties": {
                     "limit": {"type": "integer", "description": "Max records (default 50)"},
@@ -104,41 +150,41 @@ class MCPHub:
                     "status": {"type": "string", "description": "Filter by status (success/error)"},
                 },
             }),
-            Tool("hub_top_tools", "Get most used tools", {
+            Tool(name="hub_top_tools", description="Get most used tools", inputSchema={
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Top N (default 10)"}},
             }),
-            Tool("hub_error_summary", "Get recent error summary", {
+            Tool(name="hub_error_summary", description="Get recent error summary", inputSchema={
                 "type": "object",
                 "properties": {"since_hours": {"type": "number", "description": "Since N hours (default 24)"}},
             }),
-            Tool("hub_session_stats", "Get current session statistics", {"type": "object", "properties": {}}),
-            Tool("hub_slow_tools", "Get slowest tools by average duration", {
+            Tool(name="hub_session_stats", description="Get current session statistics", inputSchema={"type": "object", "properties": {}}),
+            Tool(name="hub_slow_tools", description="Get slowest tools by average duration", inputSchema={
                 "type": "object",
                 "properties": {"limit": {"type": "integer", "description": "Top N (default 10)"}},
             }),
             # Server Management (5)
-            Tool("hub_server_info", "Get server details", {
+            Tool(name="hub_server_info", description="Get server details", inputSchema={
                 "type": "object",
                 "properties": {"name": {"type": "string", "description": "Server name"}},
                 "required": ["name"],
             }),
-            Tool("hub_enable_server", "Enable a server", {
+            Tool(name="hub_enable_server", description="Enable a server", inputSchema={
                 "type": "object",
                 "properties": {"name": {"type": "string", "description": "Server name"}},
                 "required": ["name"],
             }),
-            Tool("hub_disable_server", "Disable a server", {
+            Tool(name="hub_disable_server", description="Disable a server", inputSchema={
                 "type": "object",
                 "properties": {"name": {"type": "string", "description": "Server name"}},
                 "required": ["name"],
             }),
-            Tool("hub_restart_server", "Restart a server", {
+            Tool(name="hub_restart_server", description="Restart a server", inputSchema={
                 "type": "object",
                 "properties": {"name": {"type": "string", "description": "Server name"}},
                 "required": ["name"],
             }),
-            Tool("hub_server_logs", "Get server health logs", {
+            Tool(name="hub_server_logs", description="Get server health logs", inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Server name"},
@@ -146,7 +192,7 @@ class MCPHub:
                 },
             }),
             # Tool Control (6)
-            Tool("hub_quiet_on", "Temporarily disable tools/servers", {
+            Tool(name="hub_quiet_on", description="Temporarily disable tools/servers", inputSchema={
                 "type": "object",
                 "properties": {
                     "target": {"type": "string", "description": "Tool or server name"},
@@ -155,12 +201,12 @@ class MCPHub:
                 },
                 "required": ["target"],
             }),
-            Tool("hub_quiet_off", "Re-enable quieted tools/servers", {
+            Tool(name="hub_quiet_off", description="Re-enable quieted tools/servers", inputSchema={
                 "type": "object",
                 "properties": {"target": {"type": "string", "description": "Tool/server name, or 'all'"}},
             }),
-            Tool("hub_quiet_status", "Show currently quieted items", {"type": "object", "properties": {}}),
-            Tool("hub_alias_set", "Set a tool alias", {
+            Tool(name="hub_quiet_status", description="Show currently quieted items", inputSchema={"type": "object", "properties": {}}),
+            Tool(name="hub_alias_set", description="Set a tool alias", inputSchema={
                 "type": "object",
                 "properties": {
                     "tool": {"type": "string", "description": "Full tool name (server__tool)"},
@@ -168,34 +214,34 @@ class MCPHub:
                 },
                 "required": ["tool", "alias"],
             }),
-            Tool("hub_alias_remove", "Remove a tool alias", {
+            Tool(name="hub_alias_remove", description="Remove a tool alias", inputSchema={
                 "type": "object",
                 "properties": {"alias": {"type": "string", "description": "Alias to remove"}},
                 "required": ["alias"],
             }),
-            Tool("hub_alias_list", "List all aliases", {"type": "object", "properties": {}}),
+            Tool(name="hub_alias_list", description="List all aliases", inputSchema={"type": "object", "properties": {}}),
             # Advanced (6)
-            Tool("hub_replay", "Replay last N tool calls", {
+            Tool(name="hub_replay", description="Replay last N tool calls", inputSchema={
                 "type": "object",
                 "properties": {"count": {"type": "integer", "description": "Number of calls (default 5)"}},
             }),
-            Tool("hub_replay_one", "Replay a specific call by ID", {
+            Tool(name="hub_replay_one", description="Replay a specific call by ID", inputSchema={
                 "type": "object",
                 "properties": {"id": {"type": "integer", "description": "Replay entry ID"}},
                 "required": ["id"],
             }),
-            Tool("hub_config_reload", "Manually reload config", {"type": "object", "properties": {}}),
-            Tool("hub_config_show", "Show current config", {"type": "object", "properties": {}}),
-            Tool("hub_health_history", "Get server health history", {
+            Tool(name="hub_config_reload", description="Manually reload config", inputSchema={"type": "object", "properties": {}}),
+            Tool(name="hub_config_show", description="Show current config", inputSchema={"type": "object", "properties": {}}),
+            Tool(name="hub_health_history", description="Get server health history", inputSchema={
                 "type": "object",
                 "properties": {
                     "server": {"type": "string", "description": "Filter by server"},
                     "limit": {"type": "integer", "description": "Max records (default 50)"},
                 },
             }),
-            Tool("hub_export_stats", "Export all stats as JSON", {"type": "object", "properties": {}}),
+            Tool(name="hub_export_stats", description="Export all stats as JSON", inputSchema={"type": "object", "properties": {}}),
             # Composition (2)
-            Tool("hub_compose", "Chain multiple tool calls into one workflow", {
+            Tool(name="hub_compose", description="Chain multiple tool calls into one workflow", inputSchema={
                 "type": "object",
                 "properties": {
                     "steps": {
@@ -213,7 +259,7 @@ class MCPHub:
                 },
                 "required": ["steps"],
             }),
-            Tool("hub_compose_template", "Save/load workflow templates", {
+            Tool(name="hub_compose_template", description="Save/load workflow templates", inputSchema={
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "enum": ["save", "load", "list", "delete"]},
@@ -223,7 +269,7 @@ class MCPHub:
                 "required": ["action"],
             }),
             # Sessions (2)
-            Tool("hub_session_begin", "Start a stateful multi-step session", {
+            Tool(name="hub_session_begin", description="Start a stateful multi-step session", inputSchema={
                 "type": "object",
                 "properties": {
                     "name": {"type": "string", "description": "Session name"},
@@ -231,7 +277,7 @@ class MCPHub:
                 },
                 "required": ["name"],
             }),
-            Tool("hub_session_step", "Execute a step in an active session", {
+            Tool(name="hub_session_step", description="Execute a step in an active session", inputSchema={
                 "type": "object",
                 "properties": {
                     "session_id": {"type": "string"},
@@ -241,7 +287,7 @@ class MCPHub:
                 "required": ["session_id", "tool"],
             }),
             # Cost (2)
-            Tool("hub_cost_estimate", "Estimate cost before calling a tool", {
+            Tool(name="hub_cost_estimate", description="Estimate cost before calling a tool", inputSchema={
                 "type": "object",
                 "properties": {
                     "tool": {"type": "string", "description": "Tool name"},
@@ -249,7 +295,7 @@ class MCPHub:
                 },
                 "required": ["tool"],
             }),
-            Tool("hub_cost_register", "Register cost metadata for a tool", {
+            Tool(name="hub_cost_register", description="Register cost metadata for a tool", inputSchema={
                 "type": "object",
                 "properties": {
                     "tool": {"type": "string"},

@@ -27,12 +27,21 @@ class Router:
         self._track_params = False
         self.cost_registry: dict[str, dict] = {}  # tool_name -> {cost_type, cost_value, description}
         self._call_count = 0
+        self._hub_handler = None  # Set by server: async (name, args) -> list[TextContent]
 
     def register_connector(self, name: str, connector: ServerConnector):
         self._connectors[name] = connector
 
+    def register_hub_handler(self, handler):
+        """Register a callback for hub tool dispatch. Used by compose/session."""
+        self._hub_handler = handler
+
     async def route_call(self, tool_name: str, arguments: dict | None = None) -> list:
-        """Route a tool call to the correct backend server."""
+        """Route a tool call to the correct backend server or hub handler."""
+        # Check hub tools first
+        if tool_name.startswith("hub_") and self._hub_handler:
+            return await self._hub_handler(tool_name, arguments or {})
+
         result = self.registry.get_tool(tool_name)
         if not result:
             return [TextContent(type="text", text=f"Error: Tool '{tool_name}' not found")]
