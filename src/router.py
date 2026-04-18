@@ -25,6 +25,7 @@ class Router:
         self._connectors: dict[str, ServerConnector] = {}
         self._tracking_enabled = True
         self._track_params = False
+        self.cost_registry: dict[str, dict] = {}  # tool_name -> {cost_type, cost_value, description}
 
     def register_connector(self, name: str, connector: ServerConnector):
         self._connectors[name] = connector
@@ -100,11 +101,16 @@ class Router:
 
             # Store replay entry
             try:
-                params_json = json.dumps(arguments) if arguments else "{}"
-                result_json = json.dumps([
-                    {"type": c.type, "text": c.text} for c in (result_content or [])
-                    if hasattr(c, 'text')
-                ])
+                params_json = json.dumps(arguments or {})
+                result_parts = []
+                for c in (result_content or []):
+                    if hasattr(c, 'text'):
+                        result_parts.append({"type": c.type, "text": c.text})
+                    elif hasattr(c, 'data'):
+                        result_parts.append({"type": c.type, "data": f"<{len(c.data)} bytes>"})
+                    else:
+                        result_parts.append({"type": str(type(c).__name__)})
+                result_json = json.dumps(result_parts)
                 await self.db.add_replay_entry(server_name, tool_name, params_json, result_json)
             except Exception:
                 pass

@@ -5,13 +5,16 @@ A meta-MCP server that aggregates multiple backend MCP servers into one unified 
 ## What It Does
 
 - **28 management tools** for complete control through your host agent
+- **Cross-server composition** — chain tools from different servers in one call (`hub_compose`)
+- **Stateful sessions** — multi-step workflows with context (`hub_session_begin` / `hub_session_step`)
+- **Cost estimation** — register and check tool costs before calling (`hub_cost_register` / `hub_cost_estimate`)
 - **Usage tracking** with SQLite (per-call logging, stats, error summaries)
 - **Tool aliases** — short names like `fs_read` instead of `filesystem__read_file`
 - **Smart namespacing** — auto-prefixes only when tool names conflict
 - **Quiet mode** — temporarily disable tools/servers without editing config
 - **Auto-restart** — crashed servers restart automatically with dependency ordering
 - **Call replay** — replay previous calls for debugging
-- **Config hot-reload** — edit config, changes apply without restart
+- **Config hot-reload** — edit config, add/remove servers, changes apply without restart
 - **Per-session stats** — track what happens in each session
 - **Zero extra infrastructure** — just Python + SQLite
 
@@ -135,6 +138,24 @@ servers:
 | `hub_config_show` | Show current config |
 | `hub_health_history` | Health over time |
 | `hub_export_stats` | Export stats as JSON |
+
+### Cross-Server Composition
+| Tool | What it does |
+|------|-------------|
+| `hub_compose` | Chain tools from different servers in one call |
+| `hub_compose_template` | Save/load/run workflow templates |
+
+### Stateful Sessions
+| Tool | What it does |
+|------|-------------|
+| `hub_session_begin` | Start a session with context |
+| `hub_session_step` | Execute step in session (context auto-injected) |
+
+### Cost Estimation
+| Tool | What it does |
+|------|-------------|
+| `hub_cost_estimate` | Check cost before calling a tool |
+| `hub_cost_register` | Register cost metadata for a tool |
 
 ## How It Works
 

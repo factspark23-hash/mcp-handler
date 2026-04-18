@@ -1,6 +1,7 @@
 """MCP connector - manages connections to backend MCP servers."""
 import asyncio
 import logging
+import time
 from typing import Any
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -10,7 +11,11 @@ logger = logging.getLogger("mcp_hub.connector")
 
 
 class ServerConnector:
-    """Manages a connection to one backend MCP server."""
+    """Manages a connection to one backend MCP server.
+
+    Thread-safe: all mutating operations acquire _lock.
+    call_tool acquires _call_lock so disconnect waits for in-flight calls.
+    """
 
     def __init__(self, name: str, config: dict):
         self.name = name
@@ -23,12 +28,15 @@ class ServerConnector:
         self._tools: list = []
         self._connected = False
         self._restart_count = 0
-        self._lock = asyncio.Lock()
+        self._lock = asyncio.Lock()        # guards connect/disconnect
+        self._call_lock = asyncio.Lock()    # guards in-flight calls
+        self._disconnecting = False
 
     async def connect(self) -> bool:
         async with self._lock:
             if self._connected:
                 return True
+            self._disconnecting = False
             try:
                 if self.transport == "stdio":
                     return await self._connect_stdio()
@@ -97,18 +105,39 @@ class ServerConnector:
             return []
 
     async def call_tool(self, tool_name: str, arguments: dict | None = None) -> Any:
+        """Call a tool. Raises if server is not connected or disconnecting."""
+        if self._disconnecting:
+            raise RuntimeError(f"Server '{self.name}' is disconnecting")
         if not self._connected or not self.session:
             raise RuntimeError(f"Server '{self.name}' is not connected")
-        try:
-            result = await self.session.call_tool(tool_name, arguments or {})
-            return result
-        except Exception as e:
-            logger.error(f"[{self.name}] Tool call '{tool_name}' failed: {e}")
-            raise
+
+        async with self._call_lock:
+            if self._disconnecting or not self._connected:
+                raise RuntimeError(f"Server '{self.name}' disconnected during call")
+            try:
+                result = await self.session.call_tool(tool_name, arguments or {})
+                return result
+            except Exception as e:
+                logger.error(f"[{self.name}] Tool call '{tool_name}' failed: {e}")
+                raise
 
     async def disconnect(self):
         async with self._lock:
+            if not self._connected and not self._client_ctx:
+                return
+            self._disconnecting = True
+
+        # Wait for in-flight calls to finish (with timeout)
+        try:
+            async with asyncio.timeout(10):
+                async with self._call_lock:
+                    pass
+        except asyncio.TimeoutError:
+            logger.warning(f"[{self.name}] Timed out waiting for in-flight calls")
+
+        async with self._lock:
             await self._cleanup()
+            self._disconnecting = False
 
     async def _cleanup(self):
         self._connected = False
@@ -148,7 +177,6 @@ class ServerConnector:
         if not self._connected or not self.session:
             return None
         try:
-            import time
             start = time.monotonic()
             await self.session.list_tools()
             return (time.monotonic() - start) * 1000
