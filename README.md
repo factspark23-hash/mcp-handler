@@ -1,6 +1,23 @@
-# MCP Hub
+<div align="center">
 
-A meta-MCP server that aggregates multiple backend MCP servers into one unified interface. Your host agent (Claude, Codex, OpenClaw) sees only **one** MCP server, but gets tools from **all** of them.
+# 🔌 MCP Hub
+
+**One server to rule all your MCP tools.**
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.6+-green.svg)](https://github.com/modelcontextprotocol/python-sdk)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Tests](https://img.shields.io/badge/tests-19%20passed-brightgreen.svg)](#running-tests)
+
+A **meta-MCP server** that aggregates multiple backend MCP servers into one unified interface.
+
+Your host agent (Claude, Codex, OpenClaw) sees only **one** MCP server, but gets tools from **all** of them.
+
+[Quick Start](#quick-start) • [What It Does](#what-it-does) • [Config](#config) • [Tools Reference](#tools-reference) • [Contributing](#contributing)
+
+</div>
+
+---
 
 ## Quick Start
 
@@ -26,23 +43,60 @@ Add to your host agent config (Claude Desktop example):
 }
 ```
 
-Restart your host agent. All tools from all servers are available.
+Restart your host agent. All tools from all servers are available. ✅
+
+---
 
 ## What It Does
 
-- **34 management tools** for complete control through your host agent
-- **Cross-server composition** — chain tools from different servers in one call
-- **Stateful sessions** — multi-step workflows with context carryover
-- **Cost estimation** — register and check tool costs before calling
-- **Usage tracking** — SQLite-backed per-call logging, stats, error summaries
-- **Tool aliases** — short names like `fs_read` instead of `filesystem__read_file`
+<table>
+<tr>
+<td width="50%">
+
+### 🧠 Smart Management
+- **34 management tools** for complete control
 - **Smart namespacing** — auto-prefixes only when tool names conflict
-- **Quiet mode** — temporarily disable tools/servers without editing config
+- **Tool aliases** — `fs_read` instead of `filesystem__read_file`
+- **Quiet mode** — temporarily disable tools/servers
+- **Config hot-reload** — edit config without restart
+
+</td>
+<td width="50%">
+
+### 🔗 Cross-Server Power
+- **Cross-server composition** — chain tools from different servers
+- **Stateful sessions** — multi-step workflows with context
+- **Cost estimation** — check costs before calling
 - **Auto-restart** — crashed servers restart automatically
-- **Call replay** — replay previous calls for debugging
-- **Config hot-reload** — edit config, add/remove servers without restart
-- **Per-session stats** — track what happens in each session
+- **Call replay** — replay past calls for debugging
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📊 Analytics & Tracking
+- **Usage tracking** — SQLite-backed per-call logging
+- **Per-session stats** — track success rates, durations
+- **Error summaries** — grouped error analysis
+- **Slow tool detection** — find bottlenecks
+- **Export stats** — JSON export for analysis
+
+</td>
+<td width="50%">
+
+### 🛡️ Zero Hassle
 - **Zero extra infrastructure** — just Python + SQLite
+- **Auto health checks** — periodic server pings
+- **Dependency ordering** — servers start in correct order
+- **Graceful failures** — individual tool errors don't crash hub
+- **Environment variable support** — `${VAR}` in config
+
+</td>
+</tr>
+</table>
+
+---
 
 ## Config
 
@@ -65,7 +119,7 @@ servers:
       read_file: "fs_read"
       write_file: "fs_write"
       list_directory: "fs_ls"
-    depends_on: []             # server names that must be up first
+    depends_on: []
 
   sqlite:
     transport: "stdio"
@@ -78,22 +132,19 @@ servers:
 
 namespacing:
   mode: "auto"                 # auto | always | never
-  # auto: prefix only when multiple servers have same tool name
 
 tracking:
   enabled: true
   max_records: 100000
-  track_params: false          # log tool call parameters (privacy off by default)
+  track_params: false          # privacy: don't log params by default
   session_tracking: true
 
 hotreload:
   enabled: true
-  watch_interval: 5            # seconds between config file checks
+  watch_interval: 5
 ```
 
 ### Environment Variables
-
-Use `${VAR}` or `$VAR` in config values:
 
 ```yaml
 servers:
@@ -102,58 +153,73 @@ servers:
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
 ```
 
+---
+
 ## Tools Reference
 
-### Status & Discovery (5 tools)
+<details>
+<summary><b>Status & Discovery</b> (5 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
 | `hub_status` | Hub and all servers status |
-| `hub_tools` | List all tools. Optional: `server` (filter), `search` (text search) |
-| `hub_tool_info` | Detailed info about a tool: schema, server, alias, cost |
+| `hub_tools` | List all tools. Optional: `server`, `search` |
+| `hub_tool_info` | Detailed info: schema, server, alias, cost |
 | `hub_search_tools` | Search tools by name or description |
 | `hub_refresh` | Re-discover tools from all servers |
 
-### Usage Analytics (6 tools)
+</details>
+
+<details>
+<summary><b>Usage Analytics</b> (6 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
 | `hub_stats` | Aggregated stats. Optional: `since_hours` |
-| `hub_stats_detailed` | Filtered call history. Optional: `limit`, `since_hours`, `server`, `status` |
-| `hub_top_tools` | Most used tools. Optional: `limit` |
-| `hub_error_summary` | Recent errors grouped by message. Optional: `since_hours` |
-| `hub_session_stats` | Current session stats (calls, success rate, avg duration) |
-| `hub_slow_tools` | Slowest tools by average duration. Optional: `limit` |
+| `hub_stats_detailed` | Filtered call history |
+| `hub_top_tools` | Most used tools |
+| `hub_error_summary` | Recent errors grouped by message |
+| `hub_session_stats` | Current session stats |
+| `hub_slow_tools` | Slowest tools by average duration |
 
-### Server Management (5 tools)
+</details>
+
+<details>
+<summary><b>Server Management</b> (5 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `hub_server_info` | Server details: connected, transport, tool count, restarts |
+| `hub_server_info` | Server details: connected, transport, tool count |
 | `hub_enable_server` | Enable and connect a disabled server |
 | `hub_disable_server` | Disconnect a server |
-| `hub_restart_server` | Restart a server (disconnect + reconnect + rediscover) |
-| `hub_server_logs` | Server health history. Optional: `limit` |
+| `hub_restart_server` | Restart a server |
+| `hub_server_logs` | Server health history |
 
-### Tool Control (6 tools)
+</details>
+
+<details>
+<summary><b>Tool Control</b> (6 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `hub_quiet_on` | Temporarily disable. Args: `target`, `duration` (seconds, omit for indefinite), `scope` (tool/server) |
-| `hub_quiet_off` | Re-enable. Args: `target` (name or "all") |
+| `hub_quiet_on` | Temporarily disable tools/servers |
+| `hub_quiet_off` | Re-enable |
 | `hub_quiet_status` | Show currently quieted items |
-| `hub_alias_set` | Set alias. Args: `tool` (full name), `alias` (short name) |
-| `hub_alias_remove` | Remove alias. Args: `alias` |
+| `hub_alias_set` | Set alias for a tool |
+| `hub_alias_remove` | Remove alias |
 | `hub_alias_list` | List all aliases |
 
-### Cross-Server Composition (2 tools)
+</details>
+
+<details>
+<summary><b>Cross-Server Composition</b> (2 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `hub_compose` | Chain tools. Args: `steps` — array of `{tool, arguments}`. Use `{{step_N.output}}` to pipe results |
-| `hub_compose_template` | Save/load/run templates. Args: `action` (save/load/list/delete), `name`, `steps` |
+| `hub_compose` | Chain tools from different servers |
+| `hub_compose_template` | Save/load/run composition templates |
 
-Example composition:
+Example:
 
 ```json
 {
@@ -164,30 +230,43 @@ Example composition:
 }
 ```
 
-### Stateful Sessions (2 tools)
+</details>
+
+<details>
+<summary><b>Stateful Sessions</b> (2 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `hub_session_begin` | Start session. Args: `name`, `context` (optional initial data) |
-| `hub_session_step` | Execute step. Args: `session_id`, `tool`, `arguments`. Context auto-injected as `__context__` |
+| `hub_session_begin` | Start session with optional context |
+| `hub_session_step` | Execute step with auto-injected context |
 
-### Cost Estimation (2 tools)
+</details>
 
-| Tool | Description |
-|------|-------------|
-| `hub_cost_register` | Register cost. Args: `tool`, `cost_type` (free/flat/per_call/per_token/per_byte), `cost_value` (USD), `description` |
-| `hub_cost_estimate` | Check cost. Args: `tool` |
-
-### Advanced (6 tools)
+<details>
+<summary><b>Cost Estimation</b> (2 tools)</summary>
 
 | Tool | Description |
 |------|-------------|
-| `hub_replay` | Replay last N calls. Args: `count` |
-| `hub_replay_one` | Replay specific call. Args: `id` |
+| `hub_cost_register` | Register cost for a tool |
+| `hub_cost_estimate` | Check cost before calling |
+
+</details>
+
+<details>
+<summary><b>Advanced</b> (6 tools)</summary>
+
+| Tool | Description |
+|------|-------------|
+| `hub_replay` | Replay last N calls |
+| `hub_replay_one` | Replay specific call by ID |
 | `hub_config_reload` | Reload config file |
 | `hub_config_show` | Show current config as JSON |
-| `hub_health_history` | Health history. Optional: `server`, `limit` |
+| `hub_health_history` | Health history per server |
 | `hub_export_stats` | Export all stats as JSON |
+
+</details>
+
+---
 
 ## How It Works
 
@@ -209,39 +288,47 @@ MCP Hub receives call
 Return response to Claude → Claude tells user
 ```
 
+---
+
 ## Project Structure
 
 ```
 mcp-hub/
 ├── pyproject.toml           # Package config + dependencies
 ├── config.example.yaml      # Example config
-├── README.md
 ├── src/
-│   ├── server.py            # Main MCP Server (34 hub_* tools + dispatch)
-│   ├── router.py            # Routes calls to backends (retry, tracking)
-│   ├── registry.py          # Tool discovery + namespacing + aliases
+│   ├── server.py            # Main MCP Server (34 hub_* tools)
+│   ├── router.py            # Routes calls to backends
+│   ├── registry.py          # Tool discovery + namespacing
 │   ├── connector.py         # MCP server connections (stdio/HTTP)
 │   ├── db.py                # SQLite layer (4 tables)
 │   ├── config.py            # YAML config loader + validation
-│   ├── aliases.py           # Bidirectional tool alias mapping
-│   ├── namespacing.py       # Auto/prefix/never namespacing modes
+│   ├── aliases.py           # Bidirectional alias mapping
+│   ├── namespacing.py       # Auto/prefix/never modes
 │   ├── quiet.py             # Temporary tool/server disabling
-│   ├── session.py           # Per-session call statistics
-│   ├── health.py            # Periodic health checks + uptime
+│   ├── session.py           # Per-session statistics
+│   ├── health.py            # Health checks + uptime
 │   ├── autorun.py           # Auto-restart with dependency ordering
 │   ├── replay.py            # Replay past tool calls
-│   └── hotreload.py         # Config file watching + live reload
-├── data/                    # SQLite database (created on first run)
+│   └── hotreload.py         # Config file watching
+├── data/                    # SQLite database (auto-created)
 └── tests/
-    └── test_core.py         # 19 tests covering all core modules
+    ├── test_core.py         # 19 unit tests
+    └── test_integration.py  # Integration tests
 ```
+
+---
 
 ## Running Tests
 
 ```bash
 pip install pytest pytest-asyncio
 pytest tests/ -v
+
+# 19/19 tests pass ✅
 ```
+
+---
 
 ## Tech Stack
 
@@ -252,8 +339,40 @@ pytest tests/ -v
 | Config | YAML (PyYAML) |
 | Storage | SQLite (aiosqlite) |
 | Async | asyncio |
-| HTTP | httpx (for remote MCP servers) |
+| HTTP | httpx |
+
+---
+
+## Contributing
+
+Contributions welcome! Here's how:
+
+1. **Fork** this repo
+2. **Create** a feature branch (`git checkout -b feat/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'feat: add amazing feature'`)
+4. **Push** to the branch (`git push origin feat/amazing-feature`)
+5. **Open** a Pull Request
+
+### Ideas for contributions:
+- [ ] WebSocket transport support
+- [ ] Tool usage dashboard (web UI)
+- [ ] Rate limiting per tool
+- [ ] Authentication layer
+- [ ] Docker support
+- [ ] More transport types (SSE, gRPC)
+
+---
 
 ## License
 
-MIT
+MIT — use it however you want.
+
+---
+
+<div align="center">
+
+**Built with ❤️ for the MCP community**
+
+⭐ Star this repo if you find it useful!
+
+</div>
